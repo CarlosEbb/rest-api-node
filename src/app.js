@@ -5,6 +5,7 @@ const express = require('express');
 const fetch = require("node-fetch");
 const FormData = require('form-data');
 const base64 = require('base-64');
+const basicAuth = require('express-basic-auth');
 
 //Basic Auth Y Rutas de acceso
 const login = 'GrupoMuya';
@@ -22,15 +23,8 @@ app.use(morgan('dev'));
 app.use(bodyParser.json());
 
 //peticiones
-const postPeticion = async (tipo_respuesta, tipo_doc, iddoc, nombre_apellido, ciudad, fecha, clave, valorClave, token, campo) => {
+const postPeticion = async (data) => {
   try {
-    const formulario = new FormData();
-    formulario.append("tipo_respuesta", 'PDF');
-    formulario.append("tipo_doc", '1');
-    formulario.append("iddoc", 'test1');
-    formulario.append("nombre_apellido", 'Este es un nombre de prueba');
-    formulario.append("ciudad", 'HUNCAYO');
-
     const res = await fetch(
       url,
       {
@@ -39,7 +33,7 @@ const postPeticion = async (tipo_respuesta, tipo_doc, iddoc, nombre_apellido, ci
         }),
         method: "POST",
         body: JSON.stringify(
-          {"tipo_respuesta":tipo_respuesta,"tipo_doc":tipo_doc,"iddoc":iddoc,"nombre_apellido":nombre_apellido,"ciudad":ciudad,"fecha":fecha, "clave":clave,"valorClave":valorClave,"token":token,"campo":campo}
+          data
         ),
       }
     );
@@ -55,12 +49,47 @@ const postPeticion = async (tipo_respuesta, tipo_doc, iddoc, nombre_apellido, ci
   }
 };
 
+//peticion de Basic Auth
+app.use(basicAuth({
+  users: { 'GrupoMuya' : 'GrupoMuya.2021' },
+  unauthorizedResponse: getUnauthorizedResponse
+}))
+
+function getUnauthorizedResponse(req) {
+  return req.auth
+      ? ('No autorizado')
+      : 'No se proporcionaron credenciales o Access denied'
+}
+
+const parametros = ["tipo_respuesta", "tipo_doc", "iddoc", "nombre_apellido", "ciudad", "fecha", "clave", "valorClave", "token", "campo"];
+
+
 //Rutas
 app.post('/', async(req, res)=>{
-  const data = req.body;
-  const info = await postPeticion(data.tipo_respuesta,data.tipo_doc,data.iddoc,data.nombre_apellido,data.ciudad,data.fecha,data.clave,data.valorClave,data.token,data.campo);
-  res.json(info)
+  const data = new Object();
+  let verificar = true;
+
+  parametros.forEach(function(element) {
+    if (req.body[element] !== undefined) {
+      data[element] = req.body[element];
+    }else{
+      verificar = false;
+      error = {error: 'No se recibio el valor '+element};
+      res.json(error);
+    }
+    
+  });
+  //console.log(JSON.stringify(data));
+
+  if(verificar){
+    const info = await postPeticion(data);
+    res.json(info)
+  }
 })
+
+app.get('/', function(req, res) {
+  res.send('Access denied');
+});
 
 app.listen(port, () => {
   console.log(`Server on port http://localhost:${port}`);
